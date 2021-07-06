@@ -1,0 +1,132 @@
+var express = require('express');
+var router = express.Router();
+var fs = require('fs');
+var mongoose = require('mongoose');
+var request = require('request');
+var user = require('../data.json');
+
+const country = require('../model/country')
+
+
+router.post('/userinfo',(req,res) => {
+	try{
+		let info = req.body;
+		const obj = {
+			"firstname":info.firstname,
+			"lastname":info.lastname,
+			"email":info.email,
+			"phonenumber":info.phonenumber,
+			"phonecode":info.phonecode
+		
+		}
+		user.push(obj);
+		
+		fs.readFile('data.json',function(err,result){
+			if(result){
+				fs.writeFile("data.json", JSON.stringify(user), err => {
+					if(err){
+						return res.json({status:false,msg:'Please try again later'})
+					}else{
+						
+						return res.json({status:true,msg:'User information added'})
+						
+					}
+				});
+			}else{
+				return res.json({status:false,msg:'Please try again later'})
+			}
+		})
+		
+	}catch(e){
+		return res.json({status:false,msg:'Something went wrong'})
+	}
+})
+
+router.get('/getdetails',async(req,res) => {
+	try{
+		var options = {
+		url:'https://restcountries.eu/rest/v2/all',
+		method:'GET'
+	}
+
+	request(options, (error,response) => {
+		if(error == null){
+			let body = response.body;
+			body = JSON.parse(body);
+			body.forEach(async arrayitem => {
+				var obj = {
+					"name":arrayitem.name,
+					"topLevelDomain":arrayitem.topLevelDomain[0],
+					"alpha2Code":arrayitem.alpha2Code,
+					"alpha3Code":arrayitem.alpha3Code,
+					"countrycode":arrayitem.callingCodes[0],
+					"capital":arrayitem.capital,
+					"altSpellings":arrayitem.altSpellings,
+					"region":arrayitem.region,
+					"subregion":arrayitem.subregion,
+					"population":arrayitem.population,
+					"latlng":arrayitem.latlng,
+					"demonym":arrayitem.demonym,
+					"area":arrayitem.area,
+					"gini":arrayitem.gini,
+					"timezones":arrayitem.timezones[0],
+					"borders":arrayitem.borders,
+					"nativeName":arrayitem.nativeName,
+					"numericCode":arrayitem.numericCode,
+					"currencies":arrayitem.currencies,
+					"languages":arrayitem.languages,
+					"translations":arrayitem.translations,
+					"flag":arrayitem.flag,
+					"regionalBlocs":arrayitem.regionalBlocs,
+					"cioc":arrayitem.cioc
+				}
+				await country.create(obj)		
+			})
+			res.json({status:true,msg:'Country details stored'})
+		}else{
+			res.json({status:false,msg:'Please try again later'})
+		}
+	})
+
+	}catch(e){
+		res.json({status:false,msg:'Something went wrong'})
+	}
+})
+
+
+router.post('/getcountry',(req,res)=>{
+	try{
+
+		let info = req.body;
+		let mail = info.email;
+		var resp = {};
+		fs.readFile('data.json', {encoding: 'utf-8'},  function (err, doc) {
+			 doc = JSON.parse(doc);
+	           const result = doc.find( ({ email }) => email === mail );
+	           if(!result){
+
+	           		return res.json({status:false,msg:'User not found'})
+	           
+	           }else{
+
+					country.findOne({"countrycode":result.phonecode},function(err,countrydocs){
+					
+						if(countrydocs){
+							resp.countrydetails = countrydocs;
+							resp.usersdetail = result;			
+							res.json({status:true,data:resp})
+						} else{
+							res.json({status:false,msg:'Please try again later'})
+						}
+					})
+	           }
+	        
+	    });
+	}catch(e){
+		res.json({status:false,msg:'Something went wrong'})
+	}
+})
+
+
+module.exports = router;
+
